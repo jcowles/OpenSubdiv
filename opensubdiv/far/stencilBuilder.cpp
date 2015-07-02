@@ -70,7 +70,6 @@ public:
                 bool compactWeights)
         : _size(0) 
         , _lastOffset(0)
-        , _coarseVertCount(coarseVerts)
         , _compactWeights(compactWeights)
     {
         // These numbers were chosen by profiling production assets at uniform
@@ -105,7 +104,9 @@ public:
     }
 
     template <class W, class WACCUM>
-    void AddWithWeight(int src, int dest, W weight, WACCUM weights) 
+    void AddWithWeight(StencilBuilder::Index src,
+                       StencilBuilder::Index dest,
+                       W weight, WACCUM weights)
     {
         // Factorized stencils are expressed purely in terms of the control
         // mesh verts. Without this flattening, level_i's weights would point
@@ -115,8 +116,9 @@ public:
         // So here, we check if the incoming vert (src) is in the control mesh,
         // if it is, we can simply merge it without attempting to resolve it
         // first.
-        if (src < _coarseVertCount) {
-            merge(src, dest, weight, W(1.0), _lastOffset, _size, weights);
+        if (src.GetLevel() == 0) {
+            merge(src.GetOffset(), dest.GetOffset(),
+                    weight, W(1.0), _lastOffset, _size, weights);
             return;
         }
 
@@ -124,19 +126,18 @@ public:
         // verts (src itself is made up of many control vert weights). 
         //
         // Find the src stencil and number of contributing CVs.
-        int len = _sizes[src];
-        int start = _indices[src];
+        int len = _sizes[src.GetOffset()];
+        int start = _indices[src.GetOffset()];
 
         for (int i = start; i < start+len; i++) {
             // Invariant: by processing each level in order and each vertex in
             // dependent order, any src stencil vertex reference is guaranteed
             // to consist only of coarse verts: therefore resolving src verts
             // must yield verts in the coarse mesh.
-            assert(_sources[i] < _coarseVertCount);
 
             // Merge each of src's contributing verts into this stencil.
-            merge(_sources[i], dest, weights.Get(i), weight, 
-                                _lastOffset, _size, weights);
+            merge(_sources[i], dest.GetOffset(),
+                    weights.Get(i), weight, _lastOffset, _size, weights);
         }
     }
 
@@ -287,19 +288,26 @@ private:
     std::vector<int> _dests;
 
     // The actual stencil data.
+    // Sources and weights should be treated as a pair.
+    // du/dv weights are also matched to a single source & weight,
+    // but are optional.
     std::vector<int> _sources;
     std::vector<float> _weights;
     std::vector<float> _duWeights;
     std::vector<float> _dvWeights;
 
     // Index data used to recover stencil-to-vertex mapping.
+    //
+    // The following two vectors are paired and each pair of (offset,size)
+    // represents a single stencil for a verts. The "offset" is the offset
+    // into the vectors above to the first source/weight. The size is the
+    // total number of source/weight pairs for this stencil.
     std::vector<int> _indices;
     std::vector<int> _sizes;
 
     // Acceleration members to avoid pointer chasing and reverse loops.
     int _size;
     int _lastOffset;
-    int _coarseVertCount;
     bool _compactWeights;
 };
 
@@ -369,7 +377,7 @@ StencilBuilder::Index::AddWithWeight(Index const & src, float weight)
     // Ignore no-op weights.
     if (weight == 0)
         return;
-    _owner->_weightTable->AddWithWeight(src._index, _index, weight,
+    _owner->_weightTable->AddWithWeight(src, *this, weight,
                                 _owner->_weightTable->GetScalarAccumulator());
 }
 
@@ -390,10 +398,10 @@ StencilBuilder::Index::AddWithWeight(Stencil const& src, float weight)
             continue;
         }
 
-        Vtr::Index srcIndex = srcIndices[i];
+        Index srcIndex(_owner, srcIndices[i], 0);
 
         float wgt = weight * w;
-        _owner->_weightTable->AddWithWeight(srcIndex, _index, wgt,
+        _owner->_weightTable->AddWithWeight(srcIndex, *this, wgt,
                             _owner->_weightTable->GetScalarAccumulator());
     }
 }
@@ -416,10 +424,10 @@ StencilBuilder::Index::AddWithWeight(Stencil const& src,
             continue;
         }
 
-        Vtr::Index srcIndex = srcIndices[i];
+        Index srcIndex(_owner, srcIndices[i], 0);
 
         PointDerivWeight wgt = PointDerivWeight(weight, du, dv) * w;
-        _owner->_weightTable->AddWithWeight(srcIndex, _index, wgt,
+        _owner->_weightTable->AddWithWeight(srcIndex, *this, wgt,
                            _owner->_weightTable->GetPointDerivAccumulator());
     }
 }

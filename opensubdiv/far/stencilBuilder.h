@@ -68,9 +68,10 @@ public:
     // Vertex Facade.
     class Index {
     public:
-        Index(StencilBuilder* owner, int index) 
+        Index(StencilBuilder* owner, int index, int level)
             : _owner(owner)
             , _index(index)
+            , _level(level)
         {}
 
         // Add with point/vertex weight only.
@@ -81,16 +82,21 @@ public:
         void AddWithWeight(Stencil const& src,
                                      float weight, float du, float dv);
 
+        Index NextLevel(int offset) const {
+            return Index(_owner, _index+offset, _level+1);
+        }
         Index operator[](int index) const {
-            return Index(_owner, index+_index);
+            return Index(_owner, index+_index, _level);
         }
 
         int GetOffset() const { return _index; }
+        int GetLevel() const { return _level; }
 
         void Clear() {/*nothing to do here*/}
     private:
         StencilBuilder* _owner;
         int _index;
+        int _level;
     };
 
 private:

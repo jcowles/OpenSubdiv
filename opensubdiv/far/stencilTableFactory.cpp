@@ -80,9 +80,11 @@ StencilTableFactory::Create(TopologyRefiner const & refiner,
     //
     PrimvarRefiner primvarRefiner(refiner);
 
-    internal::StencilBuilder::Index srcIndex(&builder, 0);
-    internal::StencilBuilder::Index dstIndex(&builder,
-                                        refiner.GetLevel(0).GetNumVertices());
+    typedef internal::StencilBuilder::Index BuilderIndex;
+
+    BuilderIndex srcIndex(&builder, /*offset*/0, /*level*/0);
+    BuilderIndex dstIndex(&builder, refiner.GetLevel(0).GetNumVertices(),
+                                        /*level*/ 1);
     for (int level=1; level<=maxlevel; ++level) {
         if (not interpolateVarying) {
             primvarRefiner.Interpolate(level, srcIndex, dstIndex);
@@ -90,8 +92,12 @@ StencilTableFactory::Create(TopologyRefiner const & refiner,
             primvarRefiner.InterpolateVarying(level, srcIndex, dstIndex);
         }
 
-        srcIndex = dstIndex;
-        dstIndex = dstIndex[refiner.GetLevel(level).GetNumVertices()];
+        if (options.factorizeIntermediateLevels) {
+            srcIndex = dstIndex;
+        } else {
+            //srcIndex = srcIndex[dstIndex.GetOffset()];
+        }
+        dstIndex = dstIndex.NextLevel(refiner.GetLevel(level).GetNumVertices());
     }
 
 
@@ -241,16 +247,18 @@ StencilTableFactory::AppendLocalPointStencilTable(
         }
     }
 
-    // copy all local points stencils to proto stencils, and factoriz if needed.
+    // copy all local points stencils to proto stencils, factorize if needed.
     int nLocalPointStencils = localPointStencilTable->GetNumStencils();
     int nLocalPointStencilsElements = 0;
 
     internal::StencilBuilder builder(refiner.GetLevel(0).GetNumVertices(),
                                 /*genControlVerts*/ false,
                                 /*compactWeights*/  factorize);
-    internal::StencilBuilder::Index origin(&builder, 0);
-    internal::StencilBuilder::Index dst = origin;
-    internal::StencilBuilder::Index srcIdx = origin;
+
+    typedef internal::StencilBuilder::Index BuilderIndex;
+    BuilderIndex origin(&builder, /*offset*/0, /*level*/0);
+    BuilderIndex dst = origin;
+    BuilderIndex srcIdx = origin;
 
     for (int i = 0 ; i < nLocalPointStencils; ++i) {
         Stencil src = localPointStencilTable->GetStencil(i);
@@ -412,7 +420,7 @@ LimitStencilTableFactory::Create(TopologyRefiner const & refiner,
     internal::StencilBuilder builder(refiner.GetLevel(0).GetNumVertices(),
                                 /*genControlVerts*/ false,
                                 /*compactWeights*/  true);
-    internal::StencilBuilder::Index origin(&builder, 0);
+    internal::StencilBuilder::Index origin(&builder, /*offset*/0, /*level*/0);
     internal::StencilBuilder::Index dst = origin;
 
     float wP[20], wDs[20], wDt[20];
