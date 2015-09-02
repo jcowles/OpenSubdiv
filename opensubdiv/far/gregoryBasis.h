@@ -26,6 +26,7 @@
 #define OPENSUBDIV3_FAR_GREGORY_BASIS_H
 
 #include "../vtr/level.h"
+#include "../vtr/stackBuffer.h"
 #include "../far/types.h"
 #include "../far/stencilTable.h"
 #include <cstring>
@@ -82,16 +83,18 @@ public:
         static const int RESERVED_ENTRY_SIZE = 64;
 
         Point() : _size(0) {
-            _indices.reserve(RESERVED_ENTRY_SIZE);
-            _weights.reserve(RESERVED_ENTRY_SIZE);
+            _indices.Reserve(RESERVED_ENTRY_SIZE);
+            _weights.Reserve(RESERVED_ENTRY_SIZE);
         }
 
         Point(Vtr::Index idx, float weight = 1.0f) {
-            _indices.reserve(RESERVED_ENTRY_SIZE);
-            _weights.reserve(RESERVED_ENTRY_SIZE);
+            _indices.Reserve(RESERVED_ENTRY_SIZE);
+            _weights.Reserve(RESERVED_ENTRY_SIZE);
             _size = 1;
-            _indices.push_back(idx);
-            _weights.push_back(weight);
+            _indices.SetSize(_size);
+            _weights.SetSize(_size);
+            _indices[0] = idx;
+            _weights[0] = weight;
         }
 
         Point(Point const & other) {
@@ -112,8 +115,14 @@ public:
 
         Point & operator = (Point const & other) {
             _size = other._size;
-            _indices = other._indices;
-            _weights = other._weights;
+            _indices.SetSize(_size);
+            _weights.SetSize(_size);
+            for (int i = 0; i < _size; i++) {
+                _indices[i] = other._indices[i];
+                _weights[i] = other._weights[i];
+            }
+            //_indices = other._indices;
+            //_weights = other._weights;
             return *this;
         }
 
@@ -183,15 +192,22 @@ public:
                     return i;
                 }
             }
-            _indices.push_back(idx);
-            _weights.push_back(0.0f);
             ++_size;
+            _indices.SetSize(_size);
+            _weights.SetSize(_size);
+
+            _indices[_size-1] = idx;
+            _weights[_size-1] = 0.0f;
             return _size-1;
         }
 
         int _size;
-        std::vector<Vtr::Index> _indices;
-        std::vector<float> _weights;
+        typedef Vtr::internal::StackBuffer<Vtr::Index, 64> _StackIndex;
+        typedef Vtr::internal::StackBuffer<float, 64> _StackWeights;
+        _StackIndex _indices;
+        _StackWeights _weights;
+        //std::vector<Vtr::Index> _indices;
+        //std::vector<float> _weights;
     };
 
     //
