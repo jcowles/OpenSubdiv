@@ -83,16 +83,14 @@ public:
         static const int RESERVED_ENTRY_SIZE = 64;
 
         Point() : _size(0) {
-            _indices.Reserve(RESERVED_ENTRY_SIZE);
-            _weights.Reserve(RESERVED_ENTRY_SIZE);
+            _indices.SetSize(_size);
+            _weights.SetSize(_size);
         }
 
         Point(Vtr::Index idx, float weight = 1.0f) {
-            _indices.Reserve(RESERVED_ENTRY_SIZE);
-            _weights.Reserve(RESERVED_ENTRY_SIZE);
             _size = 1;
-            _indices.SetSize(64); //_size);
-            _weights.SetSize(64); //_size);
+            _indices.SetSize(_size);
+            _weights.SetSize(_size);
             _indices[0] = idx;
             _weights[0] = weight;
         }
@@ -193,6 +191,9 @@ public:
                 }
             }
             ++_size;
+            _indices.SetSize(_size);
+            _weights.SetSize(_size);
+
             _indices[_size-1] = idx;
             _weights[_size-1] = 0.0f;
             return _size-1;
