@@ -41,6 +41,10 @@
 
 struct ID3D11DeviceContext;
 
+
+#include <iostream>
+#include "../../examples/common/stopwatch.h"
+
 namespace OpenSubdiv {
 namespace OPENSUBDIV_VERSION {
 
@@ -98,16 +102,25 @@ protected:
                                   int level, bool adaptive,
                                   bool singleCreasePatch) {
         if (adaptive) {
+            Stopwatch watch;
+            watch.Start();
             Far::TopologyRefiner::AdaptiveOptions options(level);
             options.useSingleCreasePatch = singleCreasePatch;
             refiner.RefineAdaptive(options);
+            watch.Stop();
+            std::cout << "Adaptive(" << level << "):             " << watch.GetElapsed() << "\n";
         } else {
+            Stopwatch watch;
+            watch.Start();
             //  This dependency on FVar channels should not be necessary
             bool fullTopologyInLastLevel = refiner.GetNumFVarChannels()>0;
 
             Far::TopologyRefiner::UniformOptions options(level);
             options.fullTopologyInLastLevel = fullTopologyInLastLevel;
             refiner.RefineUniform(options);
+
+            watch.Stop();
+            std::cout << "Uniform(" << level << "): " << watch.GetElapsed() << "\n";
         }
     }
 };
@@ -509,25 +522,34 @@ private:
                                                                options);
         }
 
+        Stopwatch watch;
+        watch.Start();
         Far::PatchTableFactory::Options poptions(level);
         poptions.generateFVarTables = bits.test(MeshFVarData);
         poptions.useSingleCreasePatch = bits.test(MeshUseSingleCreasePatch);
 
+        std::cout << "    PatchTable(";
         if (bits.test(MeshEndCapBSplineBasis)) {
             poptions.SetEndCapType(
                 Far::PatchTableFactory::Options::ENDCAP_BSPLINE_BASIS);
+            std::cout << "BSpline): ";
         } else if (bits.test(MeshEndCapGregoryBasis)) {
             poptions.SetEndCapType(
                 Far::PatchTableFactory::Options::ENDCAP_GREGORY_BASIS);
             // points on gregory basis endcap boundary can be shared among
             // adjacent patches to save some stencils.
             poptions.shareEndCapPatchPoints = true;
+            std::cout << "G-Basis): ";
         } else if (bits.test(MeshEndCapLegacyGregory)) {
             poptions.SetEndCapType(
                 Far::PatchTableFactory::Options::ENDCAP_LEGACY_GREGORY);
+            std::cout << "Leg-G): ";
         }
 
         _farPatchTable = Far::PatchTableFactory::Create(*_refiner, poptions);
+
+        watch.Stop();
+        std::cout << watch.GetElapsed() << "\n";
 
         // if there's endcap stencils, merge it into regular stencils.
         if (_farPatchTable->GetLocalPointStencilTable()) {
